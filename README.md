@@ -22,12 +22,12 @@ ThemeScope/
 ## Installation
 
 ```r
-# Install the package from this repository
+# Install the package from GitHub
 # install.packages("devtools")
-devtools::install_github("<your-username>/ThemeScope", subdir = "pkg/ThemeScope")
+devtools::install_github("mariaspano/ThemeScope", subdir = "pkg/ThemeScope")
 ```
 
-Or locally:
+Or locally (after cloning the repository):
 
 ```r
 devtools::install("pkg/ThemeScope")
@@ -51,12 +51,45 @@ as.data.frame(result)
 
 ## Shiny application
 
+The app provides a point-and-click interface for the full pipeline without writing any code.
+
+### Requirements
+
+Install the required packages before launching:
+
 ```r
-shiny::runApp("shiny/app.R")
+install.packages(c("shiny", "bslib", "DT", "plotly", "visNetwork", "shinycssloaders"))
 ```
 
-The app provides a point-and-click interface for the full pipeline:
-upload an annotated CSV → configure parameters → run analysis → explore interactive maps and networks.
+The ThemeScope R package must also be installed (see above).
+
+### Launch
+
+**Option 1 — from RStudio / Positron:**
+
+Open `shiny/app.R` and click the **Run App** button in the editor toolbar.
+
+**Option 2 — from the R console:**
+
+```r
+# If the repository is cloned locally:
+shiny::runApp("shiny/app.R")
+
+# Or directly from GitHub (no local clone needed):
+shiny::runGitHub("ThemeScope", "mariaspano", subdir = "shiny")
+```
+
+### Workflow inside the app
+
+1. **Info** tab — read the methodology and input format requirements
+2. **Upload** — load a pre-annotated CSV with columns `doc_id`, `sentence_id`, `lemma`, `upos`
+   - A built-in demo corpus (climate change, Reddit) is available without uploading anything
+3. **Parameters** — set vocabulary size, co-occurrence window, community detection settings
+4. **Run analysis** — click *Run ThemeScope* and wait for the pipeline to complete
+5. **Map** — explore the interactive PSI × CS quadrant map (zoom, hover, click communities)
+6. **Network** — navigate the co-occurrence network with drag, zoom, and community filter
+7. **Results** — browse and download the community-level data table
+8. **Download** — export the map (HTML), network (HTML), or results (CSV)
 
 ## Preparing input data
 
