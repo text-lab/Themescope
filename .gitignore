@@ -1,0 +1,66 @@
+# ---- Large data files --------------------------------------------------------
+*.RData
+*.rds
+*.rda
+# Exception: bundled package data (small, required)
+!pkg/ThemeScope/data/*.rda
+
+# ---- Large corpora -----------------------------------------------------------
+dfTag_climate_complete.csv
+df_filtered_2025_climate_change.csv
+tokens_sample_*.csv
+
+# ---- Analysis output files (reproducible from scripts) ----------------------
+*.xlsx
+*.numbers
+ablation_study*.R
+callon_vs_themescope*.R
+lda_themescope_comparison*.R
+window_sensitivity.R
+sensitivity_vocabulary_size.R
+routine_scale.R
+create_comparative_lexical_table.R
+lexical_statistics_calculator.R
+tallFunctions.R
+LDA_Report*
+outputs/
+Coverage_lexicon/
+
+# ---- Figures (reproducible) -------------------------------------------------
+*.png
+*.pdf
+jaccard_*.pdf
+coherence_*.pdf
+
+# ---- Analysis output CSVs (reproducible) ------------------------------------
+gephi_nodes.csv
+network_terms_upos.csv
+nodes_with_concreteness.csv
+vocabulary_full.csv
+lexical_statistics_comparative.csv
+lexical_statistics_comparative.tex
+lexical_statistics_comparative_sections.tex
+brysbaert_coverage_by_pos_network.csv
+SM_Ablation_Study_Complete_Data.csv
+SM_Table_S1_Transition_Matrix.csv
+SM_Table_S2_Top_Displacements.csv
+TABLE_window_comparison.csv
+
+# ---- Claude internal ---------------------------------------------------------
+.claude/
+
+# ---- OS / IDE ----------------------------------------------------------------
+.DS_Store
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+**/__pycache__/
+.vscode/
+.positron/
+
+# ---- R package build artefacts ----------------------------------------------
+pkg/ThemeScope/*.tar.gz
+pkg/ThemeScope/src/*.o
+pkg/ThemeScope/src/*.so
+pkg/ThemeScope/src/*.dll

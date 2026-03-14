@@ -1,0 +1,31 @@
+Package: ThemeScope
+Title: Social Representation Analysis via Semantic Network Mapping
+Version: 0.1.0
+Authors@R: person("ThemeScope", "Authors", email = "themescope@example.com", role = c("aut", "cre"))
+Description: Implements the ThemeScope framework for detecting and visualizing social
+    representations in large-scale digital text corpora. Combines sentence-level
+    word co-occurrence networks with Social Representation Theory constructs:
+    Prototypical Salience Index (PSI) for anchoring and Concreteness Score (CS)
+    for objectification. Produces two-dimensional thematic maps that locate
+    communities in a theoretically grounded representational space.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Imports:
+    methods,
+    igraph (>= 2.0.0),
+    ggplot2 (>= 3.4.0),
+    ggrepel (>= 0.9.0),
+    dplyr (>= 1.1.0),
+    Matrix (>= 1.6.0),
+    cli (>= 3.6.0),
+    grDevices
+Suggests:
+    ggraph (>= 2.1.0),
+    udpipe (>= 0.8.11),
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
