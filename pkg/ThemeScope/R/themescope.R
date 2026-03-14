@@ -25,8 +25,10 @@
 #'   (default \code{c("NOUN", "ADJ", "PROPN")}).
 #' @param threshold_percentile Numeric in \eqn{(0, 1)}. Percentile of non-zero
 #'   AS values used to threshold the network (default \code{0.98}).
-#' @param walktrap_steps Integer. Steps for walktrap community detection
-#'   (default \code{4}).
+#' @param community_algorithm Character. Community detection algorithm:
+#'   \code{"walktrap"} (default) or \code{"louvain"}.
+#' @param walktrap_steps Integer. Steps for walktrap random walk (default
+#'   \code{4}). Ignored when \code{community_algorithm = "louvain"}.
 #' @param min_community_size Integer. Communities smaller than this are removed
 #'   (default \code{10}).
 #' @param verbose Logical. Print progress messages (default \code{TRUE}).
@@ -64,6 +66,7 @@ themescope <- function(tokens_df,
                         vocab_size             = 1500,
                         pos_filter             = c("NOUN", "ADJ", "PROPN"),
                         threshold_percentile   = 0.98,
+                        community_algorithm    = "walktrap",
                         walktrap_steps         = 4,
                         min_community_size     = 10,
                         verbose                = TRUE) {
@@ -113,9 +116,10 @@ themescope <- function(tokens_df,
   # ---- 5. Community detection ----
   themescope_progress("Step 5/7: Detecting communities...", verbose)
   comm_result <- detect_communities(
-    graph    = graph,
-    steps    = walktrap_steps,
-    min_size = min_community_size
+    graph      = graph,
+    algorithm  = community_algorithm,
+    steps      = walktrap_steps,
+    min_size   = min_community_size
   )
 
   communities <- comm_result$communities
@@ -163,6 +167,7 @@ themescope <- function(tokens_df,
     vocab_size            = vocab_size,
     pos_filter            = pos_filter,
     threshold_percentile  = threshold_percentile,
+    community_algorithm   = community_algorithm,
     walktrap_steps        = walktrap_steps,
     min_community_size    = min_community_size
   )

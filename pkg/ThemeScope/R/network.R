@@ -95,13 +95,15 @@ build_network <- function(as_matrix, threshold_percentile = 0.98) {
 
 #' Detect communities in a semantic network
 #'
-#' Runs the walktrap community detection algorithm on a weighted undirected
-#' graph and filters out small communities.
+#' Runs walktrap or Louvain community detection on a weighted undirected graph
+#' and filters out small communities.
 #'
 #' @param graph An undirected weighted \code{igraph} object (e.g., as returned
 #'   by \code{\link{build_network}}).
-#' @param steps Integer. Number of steps for the walktrap random walk
-#'   (default \code{4}).
+#' @param algorithm Character. Community detection algorithm: \code{"walktrap"}
+#'   (default) or \code{"louvain"}.
+#' @param steps Integer. Number of steps for walktrap random walk (default
+#'   \code{4}). Ignored when \code{algorithm = "louvain"}.
 #' @param min_size Integer. Minimum number of members for a community to be
 #'   retained. Smaller communities are assigned \code{NA} membership
 #'   (default \code{10}).
@@ -112,21 +114,23 @@ build_network <- function(as_matrix, threshold_percentile = 0.98) {
 #'       community ID (\code{NA} for vertices in small communities).}
 #'     \item{\code{communities}}{Named list of character vectors. Each element
 #'       is a retained community, containing the names of its member vertices.}
-#'     \item{\code{walktrap_result}}{The raw \code{communities} object returned
-#'       by \code{\link[igraph]{cluster_walktrap}}.}
+#'     \item{\code{algorithm_result}}{The raw \code{communities} object returned
+#'       by igraph.}
 #'   }
 #'
 #' @examples
 #' \dontrun{
-#' comm <- detect_communities(graph, steps = 4, min_size = 10)
+#' comm <- detect_communities(graph, algorithm = "walktrap", steps = 4, min_size = 10)
+#' comm <- detect_communities(graph, algorithm = "louvain", min_size = 10)
 #' length(comm$communities)
 #' }
 #'
 #' @export
-detect_communities <- function(graph, steps = 4, min_size = 10) {
+detect_communities <- function(graph, algorithm = "walktrap", steps = 4, min_size = 10) {
   if (!igraph::is_igraph(graph)) {
     cli::cli_abort("{.arg graph} must be an {.cls igraph} object.")
   }
+  algorithm <- match.arg(algorithm, c("walktrap", "louvain"))
   if (!is.numeric(steps) || steps < 1) {
     cli::cli_abort("{.arg steps} must be a positive integer.")
   }
@@ -134,11 +138,14 @@ detect_communities <- function(graph, steps = 4, min_size = 10) {
     cli::cli_abort("{.arg min_size} must be a positive integer.")
   }
 
-  steps <- as.integer(steps)
+  steps    <- as.integer(steps)
   min_size <- as.integer(min_size)
 
-  wt <- igraph::cluster_walktrap(graph, steps = steps,
-                                   weights = igraph::E(graph)$weight)
+  wt <- if (algorithm == "louvain") {
+    igraph::cluster_louvain(graph, weights = igraph::E(graph)$weight)
+  } else {
+    igraph::cluster_walktrap(graph, steps = steps, weights = igraph::E(graph)$weight)
+  }
 
   raw_membership <- igraph::membership(wt)
   vertex_names   <- igraph::V(graph)$name
@@ -176,9 +183,9 @@ detect_communities <- function(graph, steps = 4, min_size = 10) {
   )
 
   list(
-    membership       = new_membership,
-    communities      = communities,
-    walktrap_result  = wt
+    membership        = new_membership,
+    communities       = communities,
+    algorithm_result  = wt
   )
 }
 

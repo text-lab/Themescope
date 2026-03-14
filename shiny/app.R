@@ -510,10 +510,20 @@ ui <- page_sidebar(
         min = 0.90, max = 0.99, value = 0.98, step = 0.01
       ),
 
-      numericInput(
-        "walktrap_steps",
-        "Walktrap steps",
-        value = 4, min = 2, max = 10, step = 1
+      selectInput(
+        "community_algorithm",
+        "Community detection",
+        choices  = c("Walktrap" = "walktrap", "Louvain" = "louvain"),
+        selected = "walktrap"
+      ),
+
+      conditionalPanel(
+        condition = "input.community_algorithm === 'walktrap'",
+        numericInput(
+          "walktrap_steps",
+          "Walktrap steps",
+          value = 4, min = 2, max = 10, step = 1
+        )
       ),
 
       numericInput(
@@ -1135,6 +1145,7 @@ server <- function(input, output, session) {
             vocab_size            = input$vocab_size,
             pos_filter            = input$pos_filter,
             threshold_percentile  = input$threshold_percentile,
+            community_algorithm   = input$community_algorithm,
             walktrap_steps        = input$walktrap_steps,
             min_community_size    = input$min_community_size,
             verbose               = FALSE
@@ -1384,6 +1395,7 @@ server <- function(input, output, session) {
         "Vocabulary size",
         "POS filter",
         "AS threshold percentile",
+        "Community detection",
         "Walktrap steps",
         "Min community size",
         "Concreteness lexicon"
@@ -1392,7 +1404,8 @@ server <- function(input, output, session) {
         as.character(p$vocab_size),
         paste(p$pos_filter, collapse = ", "),
         as.character(p$threshold_percentile),
-        as.character(p$walktrap_steps),
+        toupper(p$community_algorithm),
+        if (p$community_algorithm == "walktrap") as.character(p$walktrap_steps) else "—",
         as.character(p$min_community_size),
         if (!is.null(input$lexicon_upload)) input$lexicon_upload$name else "Brysbaert et al. (2014) — bundled"
       ),
