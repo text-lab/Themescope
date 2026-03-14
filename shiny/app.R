@@ -98,7 +98,7 @@ get_top_terms <- function(result, n = 10) {
 }
 
 # ---- Helper: ThemeScope map as plotly ----------------------------------------
-build_map_plotly <- function(result, custom_labels = NULL) {
+build_map_plotly <- function(result, custom_labels = NULL, pal = NULL) {
 
   comm_sizes <- sapply(result$communities, length)
   psi  <- result$psi
@@ -135,7 +135,11 @@ build_map_plotly <- function(result, custom_labels = NULL) {
     else "Latent Representations"
   }, psi_z, cs_z)
 
-  node_color <- quad_colors[quadrant]
+  node_color <- if (!is.null(pal)) {
+    pal[comm_names]
+  } else {
+    quad_colors[quadrant]
+  }
   node_size  <- 10 + (comm_sizes / max(comm_sizes)) * 25
 
   hover_text <- paste0(
@@ -212,7 +216,7 @@ build_map_plotly <- function(result, custom_labels = NULL) {
 
 # ---- Helper: network as plotly -----------------------------------------------
 # ---- Helper: network as visNetwork ------------------------------------------
-build_network_visnetwork <- function(result, custom_labels = NULL) {
+build_network_visnetwork <- function(result, custom_labels = NULL, pal = NULL) {
   g    <- result$graph
   memb <- result$membership
   deg  <- igraph::degree(g)
@@ -230,9 +234,11 @@ build_network_visnetwork <- function(result, custom_labels = NULL) {
 
   # Colour palette
   unique_comms <- sort(unique(na.omit(comm_ids)))
-  n_c  <- length(unique_comms)
-  cols <- grDevices::hcl.colors(n_c, palette = "Set2")
-  pal  <- setNames(cols, as.character(unique_comms))
+  if (is.null(pal)) {
+    n_c  <- length(unique_comms)
+    cols <- grDevices::hcl.colors(n_c, palette = "Set2")
+    pal  <- setNames(cols, as.character(unique_comms))
+  }
 
   # ---- Nodes data frame ----
   node_size  <- 10 + log1p(deg) * 5
@@ -1129,10 +1135,19 @@ server <- function(input, output, session) {
     )
   }
 
+  # ---- Shared community colour palette ---------------------------------------
+  community_palette <- reactive({
+    req(result_obj())
+    comm_ids <- sort(as.integer(names(result_obj()$psi)))
+    n_c  <- length(comm_ids)
+    cols <- grDevices::hcl.colors(n_c, palette = "Set2")
+    setNames(cols, as.character(comm_ids))
+  })
+
   # ---- Map plot (plotly) -----------------------------------------------------
   map_reactive <- reactive({
     req(result_obj())
-    build_map_plotly(result_obj(), custom_labels())
+    build_map_plotly(result_obj(), custom_labels(), community_palette())
   })
 
   output$map_placeholder <- renderUI({
@@ -1149,7 +1164,7 @@ server <- function(input, output, session) {
   # ---- Network plot (visNetwork) ---------------------------------------------
   network_reactive <- reactive({
     req(result_obj())
-    build_network_visnetwork(result_obj(), custom_labels())
+    build_network_visnetwork(result_obj(), custom_labels(), community_palette())
   })
 
   output$network_placeholder <- renderUI({
@@ -1374,15 +1389,10 @@ server <- function(input, output, session) {
 
   observe({
     req(result_obj())
-    df <- top_terms_df()
-    cl <- custom_labels()
+    df  <- top_terms_df()
+    cl  <- custom_labels()
+    pal <- community_palette()
     comms <- sort(unique(df$community))
-
-    n_comms <- length(comms)
-    pal <- setNames(
-      grDevices::hcl.colors(n_comms, palette = "Set2"),
-      as.character(comms)
-    )
 
     lapply(comms, function(cid) {
       local({
@@ -1454,7 +1464,7 @@ server <- function(input, output, session) {
   )
 
   build_network_export <- function() {
-    net <- build_network_visnetwork(result_obj(), custom_labels())
+    net <- build_network_visnetwork(result_obj(), custom_labels(), community_palette())
     net$x$width  <- "1400px"
     net$x$height <- "900px"
     net
