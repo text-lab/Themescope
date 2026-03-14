@@ -277,6 +277,29 @@ build_network_visnetwork <- function(result, custom_labels = NULL, pal = NULL) {
     stringsAsFactors = FALSE
   )
 
+  # ---- Community layout: centroids on outer circle, nodes on inner circles ----
+  unique_comms_l <- sort(unique(na.omit(comm_ids)))
+  n_cl    <- length(unique_comms_l)
+  R_outer <- 1400
+  node_x  <- stats::setNames(rep(0, length(vnames)), vnames)
+  node_y  <- stats::setNames(rep(0, length(vnames)), vnames)
+  for (ki in seq_along(unique_comms_l)) {
+    cid     <- unique_comms_l[ki]
+    members <- vnames[!is.na(comm_ids) & comm_ids == cid]
+    n_m     <- length(members)
+    theta_c <- 2 * pi * (ki - 1) / n_cl
+    cx      <- R_outer * cos(theta_c)
+    cy      <- R_outer * sin(theta_c)
+    r_inner <- max(150, 60 * sqrt(n_m))
+    for (ji in seq_along(members)) {
+      theta_n <- 2 * pi * (ji - 1) / n_m
+      node_x[members[ji]] <- cx + r_inner * cos(theta_n)
+      node_y[members[ji]] <- cy + r_inner * sin(theta_n)
+    }
+  }
+  nodes$x <- node_x[nodes$id]
+  nodes$y <- node_y[nodes$id]
+
   # ---- visNetwork ----
   visNetwork::visNetwork(nodes, edges,
     main = list(text = "Semantic Co-occurrence Network",
@@ -287,11 +310,7 @@ build_network_visnetwork <- function(result, custom_labels = NULL, pal = NULL) {
       highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
       selectedBy       = list(variable = "group", main = "Filter by community")
     ) |>
-    visNetwork::visPhysics(
-      solver          = "forceAtlas2Based",
-      forceAtlas2Based = list(gravitationalConstant = -50, springLength = 100),
-      stabilization   = list(iterations = 150)
-    ) |>
+    visNetwork::visPhysics(enabled = FALSE) |>
     visNetwork::visEdges(smooth = list(enabled = FALSE)) |>
     visNetwork::visNodes(
       shape  = "dot",
@@ -521,10 +540,12 @@ ui <- page_sidebar(
 
   # ---- Main panel ------------------------------------------------------------
   navset_card_tab(
-    id = "main_tabs",
+    id       = "main_tabs",
+    selected = "info",
 
     # --- Tab 0: Info ----------------------------------------------------------
     nav_panel(
+      value = "info",
       title = tagList(icon("circle-info"), " Info"),
       div(
         class = "container-fluid py-4 px-4",
@@ -794,7 +815,43 @@ ui <- page_sidebar(
       )
     ),
 
-    # --- Tab 1: Map -----------------------------------------------------------
+    # --- Tab 1: Summary -------------------------------------------------------
+    nav_panel(
+      title = tagList(icon("chart-bar"), " Summary"),
+      layout_columns(
+        col_widths = c(6, 6),
+
+        card(
+          card_header("Network Statistics"),
+          card_body(
+            uiOutput("summary_placeholder_net"),
+            withSpinner(
+              tableOutput("network_stats_table"),
+              type  = 6,
+              color = "#2c3e50"
+            )
+          )
+        ),
+
+        card(
+          card_header("Analysis Parameters"),
+          card_body(
+            uiOutput("summary_placeholder_params"),
+            tableOutput("params_table")
+          )
+        ),
+
+        card(
+          col_widths = 12,
+          card_header("Console Output"),
+          card_body(
+            verbatimTextOutput("summary_text")
+          )
+        )
+      )
+    ),
+
+    # --- Tab 2: Map -----------------------------------------------------------
     nav_panel(
       title = tagList(icon("map"), " Map"),
       card(
@@ -809,28 +866,6 @@ ui <- page_sidebar(
           uiOutput("map_placeholder"),
           withSpinner(
             plotlyOutput("map_plot", height = "580px"),
-            type  = 6,
-            color = "#2c3e50"
-          )
-        )
-      )
-    ),
-
-    # --- Tab 2: Network -------------------------------------------------------
-    nav_panel(
-      title = tagList(icon("circle-nodes"), " Network"),
-      card(
-        full_screen = TRUE,
-        card_header(
-          class = "d-flex justify-content-between align-items-center",
-          tagList("Co-occurrence Network",
-            tags$small(class="text-muted ms-2", "(usa la \U1F4F7 toolbar per PNG)")),
-          downloadButton("dl_net_png", "HTML", class = "btn-sm btn-outline-secondary")
-        ),
-        card_body(
-          uiOutput("network_placeholder"),
-          withSpinner(
-            visNetworkOutput("network_plot", height = "620px"),
             type  = 6,
             color = "#2c3e50"
           )
@@ -869,42 +904,6 @@ ui <- page_sidebar(
       )
     ),
 
-    # --- Tab 4: Summary -------------------------------------------------------
-    nav_panel(
-      title = tagList(icon("chart-bar"), " Summary"),
-      layout_columns(
-        col_widths = c(6, 6),
-
-        card(
-          card_header("Network Statistics"),
-          card_body(
-            uiOutput("summary_placeholder_net"),
-            withSpinner(
-              tableOutput("network_stats_table"),
-              type  = 6,
-              color = "#2c3e50"
-            )
-          )
-        ),
-
-        card(
-          card_header("Analysis Parameters"),
-          card_body(
-            uiOutput("summary_placeholder_params"),
-            tableOutput("params_table")
-          )
-        ),
-
-        card(
-          col_widths = 12,
-          card_header("Console Output"),
-          card_body(
-            verbatimTextOutput("summary_text")
-          )
-        )
-      )
-    ),
-
     # --- Tab 5: Top Terms -----------------------------------------------------
     nav_panel(
       title = tagList(icon("list-ol"), " Top Terms"),
@@ -921,6 +920,28 @@ ui <- page_sidebar(
         ),
         card_body(
           uiOutput("topterms_panels")
+        )
+      )
+    ),
+
+    # --- Tab 6: Network -------------------------------------------------------
+    nav_panel(
+      title = tagList(icon("circle-nodes"), " Network"),
+      card(
+        full_screen = TRUE,
+        card_header(
+          class = "d-flex justify-content-between align-items-center",
+          tagList("Co-occurrence Network",
+            tags$small(class="text-muted ms-2", "(usa la \U1F4F7 toolbar per PNG)")),
+          downloadButton("dl_net_png", "HTML", class = "btn-sm btn-outline-secondary")
+        ),
+        card_body(
+          uiOutput("network_placeholder"),
+          withSpinner(
+            visNetworkOutput("network_plot", height = "620px"),
+            type  = 6,
+            color = "#2c3e50"
+          )
         )
       )
     )
