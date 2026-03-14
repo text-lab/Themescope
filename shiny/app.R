@@ -903,7 +903,7 @@ ui <- page_sidebar(
       card(
         card_header(
           class = "d-flex justify-content-between align-items-center",
-          "Top Terms by Community (by Degree Centrality)",
+          "Top Terms by Community",
           numericInput(
             "top_n_terms",
             label = "Top N",
@@ -912,22 +912,7 @@ ui <- page_sidebar(
           )
         ),
         card_body(
-          uiOutput("topterms_placeholder"),
-          withSpinner(
-            uiOutput("topterms_plot_ui"),
-            type  = 6,
-            color = "#2c3e50"
-          )
-        )
-      ),
-      card(
-        card_header("Top Terms Table"),
-        card_body(
-          withSpinner(
-            DTOutput("topterms_table"),
-            type  = 6,
-            color = "#2c3e50"
-          )
+          uiOutput("topterms_panels")
         )
       )
     )
@@ -1346,59 +1331,108 @@ server <- function(input, output, session) {
     get_top_terms(result_obj(), n = n)
   })
 
-  output$topterms_placeholder <- renderUI({
+  output$topterms_panels <- renderUI({
     if (is.null(result_obj())) {
-      placeholder_card("Run the analysis to view top terms per community.")
+      return(placeholder_card("Run the analysis to view top terms per community."))
     }
+    df  <- top_terms_df()
+    cl  <- custom_labels()
+    comms <- sort(unique(df$community))
+
+    get_label <- function(cid) {
+      lbl <- if (!is.null(cl) && as.character(cid) %in% names(cl))
+        cl[as.character(cid)] else as.character(cid)
+      paste0("Community ", lbl)
+    }
+
+    panels <- lapply(comms, function(cid) {
+      pid <- paste0("comm_", gsub("[^A-Za-z0-9]", "_", cid))
+      nav_panel(
+        title = get_label(cid),
+        div(
+          style = "display: flex; gap: 16px; align-items: flex-start;",
+          div(
+            style = "flex: 1; min-width: 0;",
+            withSpinner(
+              plotlyOutput(paste0("topterms_plot_", pid), height = "420px"),
+              type = 6, color = "#2c3e50"
+            )
+          ),
+          div(
+            style = "flex: 1; min-width: 0;",
+            withSpinner(
+              DTOutput(paste0("topterms_tbl_", pid)),
+              type = 6, color = "#2c3e50"
+            )
+          )
+        )
+      )
+    })
+
+    do.call(navset_pill, c(panels, list(id = "topterms_comm_tabs")))
   })
 
-  output$topterms_plot_ui <- renderUI({
-    req(result_obj())
-    n_comms <- length(unique(top_terms_df()$community))
-    nrows   <- ceiling(n_comms / min(2L, n_comms))
-    h_px    <- max(500, nrows * 320)
-    plotlyOutput("topterms_plot", height = paste0(h_px, "px"))
-  })
-
-  output$topterms_plot <- renderPlotly({
-    req(result_obj())
-    build_topterms_plotly(top_terms_df(), custom_labels())
-  })
-
-  output$topterms_table <- renderDT({
+  observe({
     req(result_obj())
     df <- top_terms_df()
-    df <- df[!is.na(df$term), ]
-
-    # Apply custom labels
     cl <- custom_labels()
-    if (!is.null(cl)) {
-      df$community <- ifelse(
-        df$community %in% names(cl),
-        cl[df$community],
-        df$community
-      )
-    }
+    comms <- sort(unique(df$community))
 
-    datatable(
-      df,
-      rownames  = FALSE,
-      filter    = "top",
-      colnames  = c("Community", "Rank", "Term", "Degree"),
-      options   = list(
-        dom        = "lftip",
-        pageLength = 30,
-        scrollX    = TRUE
-      ),
-      class = "stripe hover compact"
-    ) |>
-      formatStyle(
-        "degree",
-        background = styleColorBar(range(df$degree, na.rm = TRUE), "#a9cce3"),
-        backgroundSize     = "100% 80%",
-        backgroundRepeat   = "no-repeat",
-        backgroundPosition = "center"
-      )
+    n_comms <- length(comms)
+    pal <- setNames(
+      grDevices::hcl.colors(n_comms, palette = "Set2"),
+      as.character(comms)
+    )
+
+    lapply(comms, function(cid) {
+      local({
+        lcid <- cid
+        pid  <- paste0("comm_", gsub("[^A-Za-z0-9]", "_", lcid))
+
+        output[[paste0("topterms_plot_", pid)]] <- renderPlotly({
+          sub <- df[df$community == lcid & !is.na(df$term), ]
+          sub <- sub[order(sub$degree), ]
+          plot_ly(sub,
+            x    = ~degree, y = ~reorder(term, degree),
+            type = "bar", orientation = "h",
+            marker = list(color = pal[as.character(lcid)], opacity = 0.85),
+            hovertemplate = "<b>%{y}</b><br>Degree: %{x}<extra></extra>",
+            showlegend = FALSE
+          ) |>
+            layout(
+              xaxis = list(title = "Degree", showgrid = TRUE, gridcolor = "#eeeeee"),
+              yaxis = list(title = "", automargin = TRUE),
+              plot_bgcolor  = "white",
+              paper_bgcolor = "white",
+              margin = list(l = 10, r = 10, t = 20, b = 40)
+            ) |>
+            config(displayModeBar = FALSE)
+        })
+
+        output[[paste0("topterms_tbl_", pid)]] <- renderDT({
+          sub <- df[df$community == lcid & !is.na(df$term), ]
+          sub <- sub[, c("rank", "term", "degree")]
+          datatable(
+            sub,
+            rownames = FALSE,
+            colnames = c("Rank", "Term", "Degree"),
+            options  = list(
+              dom        = "tp",
+              pageLength = 15,
+              scrollX    = TRUE
+            ),
+            class = "stripe hover compact"
+          ) |>
+            formatStyle(
+              "degree",
+              background = styleColorBar(range(sub$degree, na.rm = TRUE), "#a9cce3"),
+              backgroundSize     = "100% 80%",
+              backgroundRepeat   = "no-repeat",
+              backgroundPosition = "center"
+            )
+        })
+      })
+    })
   })
 
   # ---- Download handlers -----------------------------------------------------
