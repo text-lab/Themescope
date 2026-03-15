@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="themescope_logo.svg" width="180" alt="ThemeScope logo"/>
+</p>
+
 # ThemeScope
 
 **Social Representation Analysis via Semantic Network Mapping**

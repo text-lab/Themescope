@@ -120,10 +120,10 @@ build_map_plotly <- function(result, custom_labels = NULL, pal = NULL) {
   } else comm_names
 
   quad_colors <- c(
-    "Stable Core"              = "#2166AC",
-    "Ideological Core"         = "#D6604D",
-    "Emerging Practices"       = "#4DAC26",
-    "Latent Representations"   = "#B2ABD2",
+    "Stable Core"              = "#1D9E75",   # teal  — logo Q1
+    "Ideological Core"         = "#EF9F27",   # amber — logo Q2
+    "Emerging Practices"       = "#7F77DD",   # purple — logo Q3
+    "Latent Representations"   = "#D85A30",   # coral — logo Q4
     "N/A"                      = "#aaaaaa"
   )
 
@@ -392,13 +392,22 @@ parse_uploaded_tokens <- function(filepath, filename) {
 ui <- page_sidebar(
   title = tags$span(
     style = "display:flex; align-items:center; justify-content:space-between; width:100%;",
-    # Left: app name
-    tags$span("ThemeScope", style = "font-weight:600; letter-spacing:0.03em;"),
+    # Left: logo + name
+    tags$span(
+      style = "display:flex; align-items:center; gap:0.6rem;",
+      tags$img(
+        src    = "themescope_logo.svg",
+        height = "36px",
+        style  = "vertical-align:middle;"
+      ),
+      tags$span("ThemeScope",
+        style = "font-weight:600; letter-spacing:0.04em; font-size:1.1rem;")
+    ),
     # Right: authors + GitHub
     tags$span(
       style = "font-size:0.78rem; font-weight:400; opacity:0.85; display:flex; align-items:center; gap:1.2rem;",
       tags$span(
-        style = "opacity:0.7;",
+        style = "opacity:0.75;",
         "M. Spano \u00b7 M. Misuraca \u00b7 L. D\u2019Aniello"
       ),
       tags$a(
@@ -406,7 +415,7 @@ ui <- page_sidebar(
         target = "_blank",
         style  = "color:inherit; text-decoration:none; display:flex; align-items:center; gap:0.35rem;",
         tags$svg(
-          xmlns = "http://www.w3.org/2000/svg", width = "16", height = "16",
+          xmlns = "http://www.w3.org/2000/svg", width = "15", height = "15",
           viewBox = "0 0 24 24", fill = "currentColor",
           tags$path(d = "M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z")
         ),
@@ -416,23 +425,64 @@ ui <- page_sidebar(
   ),
   theme = bs_theme(
     bootswatch = "flatly",
+    primary    = "#1D9E75",
+    secondary  = "#243b55",
     base_font  = font_google("Inter", wght = "300;400;500;600"),
     font_scale = 0.9
   ),
   tags$head(tags$style(HTML("
-    /* Navbar gradient */
+    /* ---- Navbar: navy from logo ---- */
     .navbar, .bslib-page-sidebar > .navbar {
-      background: linear-gradient(135deg, #3d4451 0%, #5a6270 60%, #7a8390 100%) !important;
-      border-bottom: none !important;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+      background: linear-gradient(120deg, #1a2e42 0%, #243b55 55%, #2e4d6b 100%) !important;
+      border-bottom: 2px solid #1D9E75 !important;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
     }
     .navbar .navbar-brand, .navbar .nav-link, .navbar-text {
-      color: #f0f2f5 !important;
+      color: #e8f4fb !important;
     }
-    /* Slightly smaller base font */
+    /* ---- Sidebar ---- */
+    .sidebar { background: #f4f7fa !important; border-right: 1px solid #dce4ec; }
+    /* ---- Cards ---- */
+    .card { border: 1px solid #dce4ec; }
+    .card-header {
+      background: linear-gradient(90deg, #243b55 0%, #2e4d6b 100%);
+      color: #e8f4fb !important;
+      font-weight: 500;
+      border-bottom: 2px solid #1D9E75;
+    }
+    .card-header .btn { color: #e8f4fb; border-color: rgba(255,255,255,0.35); }
+    .card-header .btn:hover { background: rgba(255,255,255,0.12); }
+    /* ---- Nav tabs ---- */
+    .nav-tabs .nav-link.active {
+      color: #243b55 !important;
+      border-bottom: 3px solid #1D9E75 !important;
+      font-weight: 600;
+    }
+    .nav-pills .nav-link.active {
+      background-color: #243b55 !important;
+      color: #e8f4fb !important;
+    }
+    /* ---- Buttons ---- */
+    .btn-primary { background:#1D9E75; border-color:#1D9E75; }
+    .btn-primary:hover { background:#168a63; border-color:#168a63; }
+    .btn-success { background:#1D9E75; border-color:#1D9E75; }
+    /* ---- Run button ---- */
+    #run_analysis {
+      background: linear-gradient(135deg, #1D9E75, #168a63);
+      border: none; color: #fff; font-weight: 600;
+      box-shadow: 0 2px 6px rgba(29,158,117,0.35);
+    }
+    #run_analysis:hover {
+      background: linear-gradient(135deg, #168a63, #0f6e4f);
+      box-shadow: 0 3px 10px rgba(29,158,117,0.45);
+    }
+    /* ---- General font ---- */
     body, .shiny-input-container, .card-body, .sidebar, label {
       font-size: 0.875rem;
     }
+    /* ---- Scrollbar subtle ---- */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #b0bec5; border-radius: 3px; }
   "))),
 
   # ---- Sidebar ---------------------------------------------------------------
