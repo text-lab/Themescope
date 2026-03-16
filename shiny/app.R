@@ -457,11 +457,74 @@ parse_uploaded_tokens <- function(filepath, filename) {
   df
 }
 
+# ---- Helper: lexicon coverage diagnostics ------------------------------------
+compute_lexicon_diagnostics <- function(result, tokens_df, lexicon) {
+  g        <- result$graph
+  vocab    <- igraph::V(g)$name
+  deg      <- igraph::degree(g)
+  memb     <- result$membership
+  lex_words <- tolower(lexicon$word)
+
+  # Match each vocab term to lexicon
+  matched  <- tolower(vocab) %in% lex_words
+
+  # POS lookup: most frequent POS for each lemma in corpus
+  pos_map <- tapply(tokens_df$upos, tolower(tokens_df$lemma), function(x) {
+    names(sort(table(x), decreasing = TRUE))[1]
+  })
+  upos_vec <- pos_map[tolower(vocab)]
+  upos_vec[is.na(upos_vec)] <- "UNKNOWN"
+
+  # Overall coverage
+  overall <- data.frame(
+    Metric = c("Network terms (vocab)", "Matched in Brysbaert",
+               "Out-of-Vocabulary (OOV)", "Coverage (%)"),
+    Value  = c(length(vocab), sum(matched), sum(!matched),
+               sprintf("%.1f%%", 100 * mean(matched))),
+    stringsAsFactors = FALSE
+  )
+
+  # Coverage by POS
+  by_pos <- do.call(rbind, lapply(unique(upos_vec), function(p) {
+    idx <- upos_vec == p
+    data.frame(POS = p, Terms = sum(idx),
+               Matched = sum(matched[idx]), OOV = sum(!matched[idx]),
+               Coverage = sprintf("%.1f%%", 100 * mean(matched[idx])),
+               stringsAsFactors = FALSE)
+  }))
+  by_pos <- by_pos[order(-by_pos$Terms), ]
+
+  # Coverage by community
+  comm_ids <- memb[vocab]
+  by_comm <- do.call(rbind, lapply(sort(unique(na.omit(comm_ids))), function(cid) {
+    idx <- !is.na(comm_ids) & comm_ids == cid
+    data.frame(Community = paste0("C", cid),
+               Terms    = sum(idx),
+               Matched  = sum(matched[idx]),
+               OOV      = sum(!matched[idx]),
+               Coverage = sprintf("%.1f%%", 100 * mean(matched[idx])),
+               stringsAsFactors = FALSE)
+  }))
+
+  # Top OOV by degree
+  top_oov <- data.frame(
+    Term   = vocab[!matched],
+    POS    = upos_vec[!matched],
+    Degree = deg[!matched],
+    stringsAsFactors = FALSE
+  )
+  top_oov <- head(top_oov[order(-top_oov$Degree), ], 30)
+  rownames(top_oov) <- NULL
+
+  list(overall = overall, by_pos = by_pos, by_comm = by_comm, top_oov = top_oov)
+}
+
 # ==============================================================================
 # UI
 # ==============================================================================
 
 ui <- page_sidebar(
+  window_title = "ThemeScope",
   title = tags$span(
     style = "display:flex; align-items:center; justify-content:space-between; width:100%;",
     # Left: logo + name
@@ -999,11 +1062,8 @@ ui <- page_sidebar(
           card_header("Network Statistics"),
           card_body(
             uiOutput("summary_placeholder_net"),
-            withSpinner(
-              tableOutput("network_stats_table"),
-              type  = 6,
-              color = "#2c3e50"
-            )
+            withSpinner(tableOutput("network_stats_table"),
+                        type = 6, color = "#2c3e50")
           )
         ),
 
@@ -1018,8 +1078,60 @@ ui <- page_sidebar(
         card(
           col_widths = 12,
           card_header("Console Output"),
+          card_body(verbatimTextOutput("summary_text"))
+        )
+      ),
+
+      # ---- Lexicon Diagnostics -----------------------------------------------
+      tags$h5(
+        style = "color:#243b55; font-weight:600; margin:1.4rem 0 0.8rem 0;",
+        icon("flask"), " Lexicon Diagnostics (Brysbaert Coverage)"
+      ),
+      layout_columns(
+        col_widths = c(4, 4, 4),
+
+        card(
+          card_header("Overall Coverage"),
           card_body(
-            verbatimTextOutput("summary_text")
+            uiOutput("diag_placeholder"),
+            withSpinner(tableOutput("diag_overall"),
+                        type = 6, color = "#1D9E75")
+          )
+        ),
+
+        card(
+          card_header("Coverage by POS"),
+          card_body(
+            withSpinner(tableOutput("diag_by_pos"),
+                        type = 6, color = "#1D9E75")
+          )
+        ),
+
+        card(
+          card_header("Coverage by Community"),
+          card_body(
+            withSpinner(tableOutput("diag_by_comm"),
+                        type = 6, color = "#1D9E75")
+          )
+        )
+      ),
+
+      layout_columns(
+        col_widths = c(6, 6),
+
+        card(
+          card_header("Coverage by POS — Chart"),
+          card_body(
+            withSpinner(plotlyOutput("diag_pos_plot", height = "260px"),
+                        type = 6, color = "#1D9E75")
+          )
+        ),
+
+        card(
+          card_header("Top OOV Terms (by Network Degree)"),
+          card_body(
+            withSpinner(DTOutput("diag_oov_table"),
+                        type = 6, color = "#1D9E75")
           )
         )
       )
@@ -1562,6 +1674,61 @@ server <- function(input, output, session) {
   output$summary_text <- renderPrint({
     req(result_obj())
     summary(result_obj())
+  })
+
+  # ---- Lexicon diagnostics ---------------------------------------------------
+  lexicon_diag <- reactive({
+    req(result_obj(), tokens_data())
+    compute_lexicon_diagnostics(result_obj(), tokens_data(), lexicon_data())
+  })
+
+  output$diag_placeholder <- renderUI({
+    if (is.null(result_obj()))
+      placeholder_card("Run the analysis to view lexicon diagnostics.")
+  })
+
+  output$diag_overall <- renderTable({
+    req(lexicon_diag())
+    lexicon_diag()$overall
+  }, striped = TRUE, bordered = TRUE, hover = TRUE, spacing = "s")
+
+  output$diag_by_pos <- renderTable({
+    req(lexicon_diag())
+    lexicon_diag()$by_pos
+  }, striped = TRUE, bordered = TRUE, hover = TRUE, spacing = "s")
+
+  output$diag_by_comm <- renderTable({
+    req(lexicon_diag())
+    lexicon_diag()$by_comm
+  }, striped = TRUE, bordered = TRUE, hover = TRUE, spacing = "s")
+
+  output$diag_pos_plot <- renderPlotly({
+    req(lexicon_diag())
+    bp <- lexicon_diag()$by_pos
+    bp <- bp[bp$POS != "UNKNOWN", ]
+    bp$cov_num <- as.numeric(sub("%", "", bp$Coverage))
+    plot_ly(bp, x = ~reorder(POS, -cov_num), y = ~cov_num,
+            type = "bar",
+            marker = list(color = "#1D9E75", opacity = 0.85),
+            hovertemplate = "<b>%{x}</b><br>Coverage: %{y:.1f}%<br>Terms: %{customdata}<extra></extra>",
+            customdata = ~Terms) |>
+      layout(
+        xaxis = list(title = ""),
+        yaxis = list(title = "Coverage (%)", range = c(0, 100)),
+        plot_bgcolor  = "white",
+        paper_bgcolor = "white",
+        margin = list(t = 10, b = 40)
+      ) |>
+      config(displayModeBar = FALSE)
+  })
+
+  output$diag_oov_table <- renderDT({
+    req(lexicon_diag())
+    datatable(lexicon_diag()$top_oov,
+              rownames = FALSE,
+              colnames = c("Term", "POS", "Degree"),
+              options  = list(dom = "tp", pageLength = 10, scrollX = TRUE),
+              class    = "stripe hover compact")
   })
 
   # ---- Top Terms tab ---------------------------------------------------------
