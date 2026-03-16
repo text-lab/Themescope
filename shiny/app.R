@@ -27,42 +27,100 @@ library(visNetwork)
 has_rhandsontable <- requireNamespace("rhandsontable", quietly = TRUE)
 
 # ---- Demo dataset (Reddit climate change 2025, 10k docs) ---------------------
+# ---- Demo dataset ------------------------------------------------------------
+# Try real CSV first (local machine with full corpus), else build synthetic demo
 .demo_path <- file.path(
   dirname(normalizePath(".", mustWork = FALSE)),
   "tokens_sample_10000docs.csv"
 )
 
+.make_synthetic_demo <- function() {
+  message("Building synthetic demo corpus (climate change, 5 topics x 60 docs)...")
+  set.seed(42)
+
+  topics <- list(
+    physics = list(
+      nouns = c("temperature","warming","emission","greenhouse","carbon","dioxide",
+                "methane","atmosphere","ozone","heat","drought","flood","storm",
+                "hurricane","wildfire","glacier","permafrost","arctic","ocean","sea"),
+      adjs  = c("global","extreme","severe","unprecedented","rising","critical",
+                "alarming","irreversible","catastrophic","thermal")
+    ),
+    energy = list(
+      nouns = c("energy","solar","wind","power","electricity","panel","turbine",
+                "battery","fuel","coal","gas","oil","grid","transition","capacity",
+                "generation","consumption","efficiency","hydrogen","photovoltaic"),
+      adjs  = c("renewable","clean","fossil","nuclear","sustainable","efficient",
+                "affordable","offshore","onshore","domestic")
+    ),
+    policy = list(
+      nouns = c("policy","government","law","regulation","agreement","treaty",
+                "target","commitment","action","plan","measure","fund","investment",
+                "subsidy","tax","reduction","compliance","protocol","legislation","negotiation"),
+      adjs  = c("national","international","federal","political","environmental",
+                "economic","financial","legal","binding","voluntary")
+    ),
+    science = list(
+      nouns = c("scientist","research","study","report","data","model","projection",
+                "evidence","finding","analysis","measurement","observation","simulation",
+                "forecast","impact","consequence","risk","assessment","indicator","record"),
+      adjs  = c("scientific","empirical","statistical","quantitative","comprehensive",
+                "robust","peer-reviewed","recent","experimental","observational")
+    ),
+    society = list(
+      nouns = c("community","health","food","water","migration","refugee","poverty",
+                "inequality","justice","adaptation","resilience","vulnerability",
+                "agriculture","city","infrastructure","economy","security","population",
+                "displacement","livelihood"),
+      adjs  = c("human","social","local","rural","urban","indigenous","coastal",
+                "developing","affected","vulnerable")
+    )
+  )
+
+  all_words <- unlist(lapply(topics, function(t) c(t$nouns, t$adjs)))
+  all_upos  <- unlist(lapply(topics, function(t)
+    c(rep("NOUN", length(t$nouns)), rep("ADJ", length(t$adjs)))
+  ))
+  names(all_upos) <- all_words
+
+  rows <- vector("list", length(topics) * 60 * 12)
+  idx  <- 1L
+  for (ti in seq_along(topics)) {
+    tn     <- names(topics)[ti]
+    own_w  <- c(topics[[ti]]$nouns, topics[[ti]]$adjs)
+    for (d in seq_len(60)) {
+      did <- paste0(tn, "_d", d)
+      for (s in seq_len(12)) {
+        sid  <- paste0(did, "_s", s)
+        # 6 tokens from own topic + 2 from any topic (cross-topic edges)
+        toks <- c(sample(own_w, 6, replace = TRUE),
+                  sample(all_words, 2, replace = TRUE))
+        rows[[idx]] <- data.frame(
+          doc_id      = did,
+          sentence_id = sid,
+          lemma       = toks,
+          upos        = all_upos[toks],
+          stringsAsFactors = FALSE
+        )
+        idx <- idx + 1L
+      }
+    }
+  }
+  df <- do.call(rbind, rows)
+  df$upos[is.na(df$upos)] <- "NOUN"
+  df
+}
+
 demo_data <- if (file.exists(.demo_path)) {
   message("Loading demo dataset from: ", .demo_path)
-  df <- data.table::fread(
-    .demo_path,
-    select        = c("doc_id", "sentence_id", "lemma", "upos"),
-    data.table    = FALSE
-  )
-  df
+  data.table::fread(.demo_path,
+    select = c("doc_id", "sentence_id", "lemma", "upos"),
+    data.table = FALSE)
 } else {
-  # Fallback minimo se il CSV non è disponibile
-  message("Demo CSV not found at: ", .demo_path, " — using minimal fallback.")
-  set.seed(42)
-  words <- c("climate","change","energy","carbon","government","policy",
-             "global","renewable","science","data","report","crisis",
-             "action","emission","temperature","sea","ice","flood")
-  upos  <- c(rep("NOUN",12), rep("ADJ",4), rep("NOUN",2))
-  rows  <- vector("list", 40 * 6)
-  idx   <- 1L
-  for (d in 1:40) for (s in 1:6) {
-    toks <- sample(words, 6, replace = TRUE)
-    rows[[idx]] <- data.frame(
-      doc_id      = paste0("doc", d),
-      sentence_id = paste0("doc", d, "_s", s),
-      lemma       = toks,
-      upos        = upos[match(toks, words)],
-      stringsAsFactors = FALSE
-    )
-    idx <- idx + 1L
-  }
-  do.call(rbind, rows)
+  .make_synthetic_demo()
 }
+
+.demo_is_synthetic <- !file.exists(.demo_path)
 
 .demo_n_docs  <- length(unique(demo_data$doc_id))
 .demo_n_toks  <- nrow(demo_data)
@@ -1083,16 +1141,22 @@ server <- function(input, output, session) {
     data_source("demo")
     result_obj(NULL)
     custom_labels(NULL)
-    # Parametri ottimali per il dataset Reddit climate change 10k docs
-    updateNumericInput(session, "vocab_size",           value = 1500)
-    updateNumericInput(session, "min_community_size",   value = 10)
-    updateSliderInput( session, "threshold_percentile", value = 0.98)
+    if (.demo_is_synthetic) {
+      updateNumericInput(session, "vocab_size",           value = 200)
+      updateNumericInput(session, "min_community_size",   value = 5)
+      updateSliderInput( session, "threshold_percentile", value = 0.95)
+    } else {
+      updateNumericInput(session, "vocab_size",           value = 1500)
+      updateNumericInput(session, "min_community_size",   value = 10)
+      updateSliderInput( session, "threshold_percentile", value = 0.98)
+    }
     showNotification(
       tagList(
         icon("check-circle"), " ",
-        strong("Demo caricato: "),
+        strong(if (.demo_is_synthetic) "Demo sintetico caricato: " else "Demo caricato: "),
         paste0(format(.demo_n_docs, big.mark=","), " documenti, ",
-               format(.demo_n_toks, big.mark=","), " token.")
+               format(.demo_n_toks, big.mark=","), " token.",
+               if (.demo_is_synthetic) " (5 topic clusters: physics, energy, policy, science, society)" else "")
       ),
       type     = "message",
       duration = 5
